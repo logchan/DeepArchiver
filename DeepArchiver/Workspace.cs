@@ -27,6 +27,7 @@ namespace DeepArchiver {
 
         private RemoteDb _remote;
         private RemoteService _service;
+        private JsonDb<DeepArchiverData> _db;
 
         public Workspace(string root) {
             if (!Directory.Exists(root)) {
@@ -55,6 +56,21 @@ namespace DeepArchiver {
                 _remote.Database.EnsureCreated();
 
                 Log.Information("Database ready");
+
+                _db = new JsonDb<DeepArchiverData>(Path.Combine(Root, "database.json"));
+                if (_db.Data.RemoteFiles.Count == 0) {
+                    Log.Information("Migrate to JSON db...");
+                    foreach (var file in _remote.Files.AsNoTracking()) {
+                        _db.Data.RemoteFiles.Add(new DbRemoteFile {
+                            FullName = file.FullName,
+                            Hash = file.Hash,
+                            Length = file.Length,
+                            Modified = file.Modified,
+                        });
+                    }
+
+                    SaveDatabase().Wait();
+                }
 
                 foreach (var root in _meta.Sources) {
                     Log.Information($"Scan local file in: {root}");
@@ -105,6 +121,12 @@ namespace DeepArchiver {
         public async Task Quit() {
             await _remote.DisposeAsync();
             _remote = null;
+        }
+
+        public async Task SaveDatabase() {
+            await Task.Run(() => {
+                _db.Save();
+            });
         }
 
         public void SetConnectionString(string config) {

@@ -179,6 +179,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppState.cs" />
+    <Compile Include="Data\DbRemoteFile.cs" />
+    <Compile Include="Data\DeepArchiverData.cs" />
+    <Compile Include="Data\JsonDb.cs" />
     <Compile Include="Data\RemoteFile.cs" />
     <Compile Include="Data\RemoteDb.cs" />
     <Compile Include="FileAvailability.cs" />
