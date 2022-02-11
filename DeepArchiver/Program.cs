@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Amazon;
 using Serilog;
 
 namespace DeepArchiver {
@@ -16,6 +17,7 @@ namespace DeepArchiver {
         [STAThread]
         static void Main() {
             InitLogger();
+            AWSConfigsS3.EnableUnicodeEncodingForObjectMetadata = true;
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

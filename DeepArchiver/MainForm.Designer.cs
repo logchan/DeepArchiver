@@ -151,8 +151,6 @@
             // chkRemoteOnly
             // 
             this.chkRemoteOnly.AutoSize = true;
-            this.chkRemoteOnly.Checked = true;
-            this.chkRemoteOnly.CheckState = System.Windows.Forms.CheckState.Checked;
             this.chkRemoteOnly.Location = new System.Drawing.Point(328, 25);
             this.chkRemoteOnly.Name = "chkRemoteOnly";
             this.chkRemoteOnly.Size = new System.Drawing.Size(127, 24);
@@ -180,7 +178,7 @@
             this.lstFiles.TabIndex = 5;
             this.lstFiles.UseCompatibleStateImageBehavior = false;
             this.lstFiles.View = System.Windows.Forms.View.Details;
-            this.lstFiles.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.lstFiles_KeyPress);
+            this.lstFiles.KeyDown += new System.Windows.Forms.KeyEventHandler(this.lstFiles_KeyDown);
             // 
             // colHeaderPath
             // 

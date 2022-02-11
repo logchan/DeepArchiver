@@ -253,6 +253,9 @@ namespace DeepArchiver {
             var totalSize = 0L;
             foreach (ListViewItem item in lstFiles.Items) {
                 var file = (FileMeta) item.Tag;
+                if (file.Availability == FileAvailability.RemoteOnly || file.Availability == FileAvailability.Synced) {
+                    continue;
+                }
                 if (file.MarkedAsSkip) {
                     continue;
                 }
@@ -317,8 +320,12 @@ namespace DeepArchiver {
             connStrBox.PasswordChar = showRemoteChk.Checked ? '\0' : '*';
         }
 
-        private void lstFiles_KeyPress(object sender, KeyPressEventArgs e) {
+        private void lstFiles_KeyDown(object sender, KeyEventArgs e) {
             if (lstFiles.SelectedItems.Count == 0) {
+                return;
+            }
+
+            if (e.KeyCode != Keys.Back) {
                 return;
             }
 
