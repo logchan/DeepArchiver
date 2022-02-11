@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -17,15 +15,25 @@ namespace DeepArchiver {
         private readonly AppState _state;
 
         private Workspace _workspace;
-        private readonly Dictionary<FileAvailability, CheckBox> _filterCheckboxes = new Dictionary<FileAvailability, CheckBox>();
+        private FileAvailability _shownAvailability;
 
         public MainForm() {
             InitializeComponent();
 
-            _filterCheckboxes.Add(FileAvailability.Synced, chkSynced);
-            _filterCheckboxes.Add(FileAvailability.Modified, chkModified);
-            _filterCheckboxes.Add(FileAvailability.LocalOnly, chkLocalOnly);
-            _filterCheckboxes.Add(FileAvailability.RemoteOnly, chkRemoteOnly);
+            var availRadios = new List<Tuple<RadioButton, FileAvailability>> {
+                new Tuple<RadioButton, FileAvailability>(radioLocalOnly, FileAvailability.LocalOnly),
+                new Tuple<RadioButton, FileAvailability>(radioRemoteOnly, FileAvailability.RemoteOnly),
+                new Tuple<RadioButton, FileAvailability>(radioSynced, FileAvailability.Synced)
+            };
+            availRadios.ForEach(tuple => {
+                tuple.Item1.CheckedChanged += (ev, sender) => {
+                    if (tuple.Item1.Checked) {
+                        _shownAvailability = tuple.Item2;
+                        uploadBtn.Enabled = _shownAvailability == FileAvailability.LocalOnly;
+                        RefreshList();
+                    }
+                };
+            });
 
             _state = LoadState();
             _state.LastPosition.Restore(this);
@@ -68,8 +76,6 @@ namespace DeepArchiver {
         #region Workspace
 
         private async Task OpenWorkspace(string path) {
-            await QuitWorkspace();
-
             try {
                 var ws = new Workspace(path);
                 await ws.Initialize();
@@ -88,19 +94,6 @@ namespace DeepArchiver {
             }
         }
 
-        private async Task QuitWorkspace() {
-            try {
-                if (_workspace != null) {
-                    await _workspace.Quit();
-                }
-            }
-            catch (Exception ex) {
-                Log.Error(ex, "Failed to quit workspace (discarding it anyway)");
-            }
-
-            SetTitleWithWorkspace();
-            _workspace = null;
-        }
 
         #endregion
 
@@ -115,12 +108,11 @@ namespace DeepArchiver {
             }
         }
 
-        private async void MainForm_FormClosing(object sender, FormClosingEventArgs e) {
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e) {
             _state.LastPosition.Update(this);
             _state.Workspace = _workspace?.Root ?? String.Empty;
             SaveState();
-
-            await QuitWorkspace();
+            Log.CloseAndFlush();
         }
 
         private async void MainForm_Shown(object sender, EventArgs e) {
@@ -138,11 +130,7 @@ namespace DeepArchiver {
         private void ResizeColumns() {
             colHeaderPath.Width = lstFiles.Width - 440;
         }
-
-        private void filters_CheckedChanged(object sender, EventArgs e) {
-            RefreshList();
-        }
-
+        
         private void RefreshList() {
             if (_workspace == null) {
                 return;
@@ -150,27 +138,37 @@ namespace DeepArchiver {
 
             lstFiles.Items.Clear();
 
-            var shownAvailability = (from pair in _filterCheckboxes
-                                    where pair.Value.Checked
-                                    select pair.Key).ToList();
-            foreach (var file in _workspace.Files.Where(f => shownAvailability.Contains(f.Availability))) {
-                var item = new ListViewItem() {
-                    Tag = file
-                };
-                ApplyListViewItem(item, file);
-                lstFiles.Items.Add(item);
+            var search = filterBox.Text;
+            if (_shownAvailability == FileAvailability.RemoteOnly) {
+                foreach (var file in _workspace.RemoteFiles.Where(f => f.Availability == FileAvailability.RemoteOnly && 
+                                                                       (String.IsNullOrWhiteSpace(search) || f.FullName.ToLowerInvariant().Contains(search)))) {
+                    var item = new ListViewItem {
+                        Tag = file
+                    };
+                    ApplyListViewItem(item, file.FullName, file.Length, file.Modified, file.Availability);
+                    lstFiles.Items.Add(item);
+                }
+            }
+            else {
+                foreach (var file in _workspace.LocalFiles.Where(f => f.Availability == _shownAvailability &&
+                                                                      (String.IsNullOrWhiteSpace(search) || f.FullName.ToLowerInvariant().Contains(search)))) {
+                    var item = new ListViewItem {
+                        Tag = file
+                    };
+                    ApplyListViewItem(item, file.FullName, file.Length, file.Modified, file.Availability);
+                    lstFiles.Items.Add(item);
+                }
             }
         }
 
-        private static void ApplyListViewItem(ListViewItem item, FileMeta file) {
+        private static void ApplyListViewItem(ListViewItem item, string fullName, long length, long modified, FileAvailability availability) {
             item.SubItems.Clear();
-            item.Text = file.FullName;
+            item.Text = fullName;
             item.SubItems.AddRange(new[] {
-                GetSizeString(file.Length),
-                new DateTime(file.Modified).ToString("yyyy-MM-dd HH:mm:ss"),
-                file.Availability.ToString()
+                GetSizeString(length),
+                new DateTime(modified).ToString("yyyy-MM-dd HH:mm:ss"),
+                availability.ToString()
             });
-            SetColor(item, false);
         }
 
         private void sourcesToolStripMenuItem_Click(object sender, EventArgs e) {
@@ -185,15 +183,10 @@ namespace DeepArchiver {
         }
 
         private void SetStatsString() {
-            var order = new[] { FileAvailability.Synced, FileAvailability.LocalOnly, FileAvailability.Modified, FileAvailability.RemoteOnly };
-            var sb = new StringBuilder();
+            var order = new[] { FileAvailability.Synced, FileAvailability.LocalOnly, FileAvailability.RemoteOnly };
             var stats = _workspace.Stats;
-            sb.Append($"Total: {stats.Count} ({GetSizeString(stats.Length)})");
-            foreach (var v in order) {
-                sb.Append($", {v}: {stats.Counts[v]} ({GetSizeString(stats.Lengths[v])})");
-            }
 
-            statsLbl.Text = sb.ToString();
+            statsLbl.Text = String.Join(" | ", order.Select(v => $"{v}: {stats.Counts[v]} ({GetSizeString(stats.Lengths[v])})"));
         }
 
         private static string GetSizeString(long length) {
@@ -248,20 +241,17 @@ namespace DeepArchiver {
             remoteGroup.Enabled = false;
             uploadBtn.Text = "Stop";
 
-            var queue = new List<Tuple<FileMeta, ListViewItem>>();
+            var queue = new List<Tuple<LocalFileInfo, ListViewItem>>();
             var limit = Convert.ToInt64(sizeLimitUpDown.Value) * (1 << 30);
             var totalSize = 0L;
             foreach (ListViewItem item in lstFiles.Items) {
-                var file = (FileMeta) item.Tag;
+                var file = (LocalFileInfo) item.Tag;
                 if (file.Availability == FileAvailability.RemoteOnly || file.Availability == FileAvailability.Synced) {
                     continue;
                 }
-                if (file.MarkedAsSkip) {
-                    continue;
-                }
 
-                queue.Add(new Tuple<FileMeta, ListViewItem>(file, item));
-                SetColor(item, true);
+                queue.Add(new Tuple<LocalFileInfo, ListViewItem>(file, item));
+                item.ForeColor = Color.DarkGreen;
 
                 totalSize += file.Length;
                 if (limit > 0 && totalSize > limit) {
@@ -296,7 +286,7 @@ namespace DeepArchiver {
 
                     Invoke(new Action(() => {
                         allProgress.Value = newProgress;
-                        ApplyListViewItem(item, file);
+                        ApplyListViewItem(item, file.FullName, file.Length, file.Modified, file.Availability);
                         SetStatsString();
                     }));
                 }
@@ -324,26 +314,14 @@ namespace DeepArchiver {
             if (lstFiles.SelectedItems.Count == 0) {
                 return;
             }
+            
 
-            if (e.KeyCode != Keys.Back) {
-                return;
-            }
-
-            var selected = lstFiles.SelectedItems[0];
-            var file = (FileMeta) selected.Tag;
-            file.MarkedAsSkip = !file.MarkedAsSkip;
-            SetColor(selected, false);
-            lstFiles.SelectedIndices.Clear();
         }
 
-        private static void SetColor(ListViewItem item, bool markUpload) {
-            if (markUpload) {
-                item.ForeColor = Color.DarkGreen;
-                return;
+        private void filterBox_KeyDown(object sender, KeyEventArgs e) {
+            if (e.KeyCode == Keys.Enter) {
+                RefreshList();
             }
-
-            var file = (FileMeta) item.Tag;
-            item.ForeColor = file.MarkedAsSkip ? Color.LightGray : Color.Black;
         }
     }
 }

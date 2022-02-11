@@ -1,19 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
 using DeepArchiver.Data;
 
 namespace DeepArchiver.Remote {
     public abstract class RemoteService {
-        public async Task<RemoteFile> UploadFile(string path, RemoteDb db, RemoteFile fileInfo, Action<int> progressCallback) {
+        public async Task<RemoteFileInfo> UploadFile(LocalFileInfo localFile, JsonDb<DeepArchiverData> db, Action<int> progressCallback) {
             // progress mapping:
             // - 0 ~ 10% hashing
             // - 10 ~ 100% uploading
-
+            var path = localFile.FullName;
             var fi = new FileInfo(path);
             if (!fi.Exists) {
                 throw new FileNotFoundException(path);
@@ -25,18 +23,22 @@ namespace DeepArchiver.Remote {
 
             await Upload(path, hash, p => progressCallback(10 + (int)(p * 0.9)));
 
-            if (fileInfo == null) {
-                fileInfo = new RemoteFile();
-                db.Files.Add(fileInfo);
-            }
+            var dbFile = new DbRemoteFile {
+                FullName = path,
+                Hash = hash,
+                Length = fi.Length,
+                Modified = fi.LastWriteTimeUtc.Ticks,
+            };
+            db.Data.RemoteFiles.Add(dbFile);
+            db.Save();
 
-            fileInfo.FullName = path;
-            fileInfo.Length = fi.Length;
-            fileInfo.Modified = fi.LastWriteTimeUtc.Ticks;
-            fileInfo.Hash = hash;
-
-            await db.SaveChangesAsync();
-            return fileInfo;
+            return new RemoteFileInfo {
+                FullName = path,
+                Hash = hash,
+                Length = dbFile.Length,
+                Modified = dbFile.Modified,
+                LocalFile = localFile,
+            };
         }
 
         protected abstract Task Upload(string path, string hash, Action<int> progressCallback);

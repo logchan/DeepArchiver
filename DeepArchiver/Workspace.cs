@@ -5,14 +5,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using DeepArchiver.Data;
 using DeepArchiver.Remote;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Serilog;
 
 namespace DeepArchiver {
     public sealed class Workspace {
         public string Root { get; set; }
-        public List<FileMeta> Files => _files;
+
+        public List<LocalFileInfo> LocalFiles { get; } = new List<LocalFileInfo>();
+        public List<RemoteFileInfo> RemoteFiles { get; } = new List<RemoteFileInfo>();
+
         public List<string> Sources => _meta.Sources;
         public bool HasService => _service != null;
         public string ConnectionString => _meta.ConnectionString;
@@ -22,10 +24,8 @@ namespace DeepArchiver {
         private string MetaFile => Path.Combine(Root, "meta.json");
 
         private WorkspaceMeta _meta = new WorkspaceMeta();
-        private readonly List<FileMeta> _files = new List<FileMeta>();
-        private Dictionary<string, FileMeta> _filesMap = new Dictionary<string, FileMeta>();
+        private readonly Dictionary<string, List<RemoteFileInfo>> _remoteFilesMap = new Dictionary<string, List<RemoteFileInfo>>();
 
-        private RemoteDb _remote;
         private RemoteService _service;
         private JsonDb<DeepArchiverData> _db;
 
@@ -44,62 +44,30 @@ namespace DeepArchiver {
             }
 
             await Task.Run(() => {
-
-                var connectionString = $"Data Source={Root}/remote.sqlite3";
-
-                Log.Information($"Connecting database with: {connectionString}");
-
-                var optionBuilder = new DbContextOptionsBuilder<RemoteDb>();
-                optionBuilder.UseSqlite(connectionString);
-
-                _remote = new RemoteDb(optionBuilder.Options);
-                _remote.Database.EnsureCreated();
-
-                Log.Information("Database ready");
-
                 _db = new JsonDb<DeepArchiverData>(Path.Combine(Root, "database.json"));
-                if (_db.Data.RemoteFiles.Count == 0) {
-                    Log.Information("Migrate to JSON db...");
-                    foreach (var file in _remote.Files.AsNoTracking()) {
-                        _db.Data.RemoteFiles.Add(new DbRemoteFile {
-                            FullName = file.FullName,
-                            Hash = file.Hash,
-                            Length = file.Length,
-                            Modified = file.Modified,
-                        });
-                    }
 
-                    SaveDatabase().Wait();
+                // register remote files
+                foreach (var file in _db.Data.RemoteFiles.Select(f => new RemoteFileInfo {
+                    FullName = f.FullName,
+                    Hash = f.Hash,
+                    Length = f.Length,
+                    Modified = f.Modified,
+                })) {
+                    AddRemoteFile(file);
                 }
 
+                foreach (var list in _remoteFilesMap.Values) {
+                    list.Sort((a, b) => b.Modified.CompareTo(a));
+                }
+
+                RemoteFiles.Sort((a, b) => Tklc.IO.IOHelpers.FileNameNaturalCompare(a.FullName, b.FullName));
+
+                // register local files
                 foreach (var root in _meta.Sources) {
                     Log.Information($"Scan local file in: {root}");
-                    var files = ScanFiles(root);
-                    AddLocalFiles(files, false);
+                    AddLocalFiles(ScanFiles(root));
                 }
-
-                Log.Information($"Found {_files.Count} local files");
-
-                var numRemoteOnly = 0;
-                foreach (var file in _remote.Files) {
-                    if (_filesMap.ContainsKey(file.FullName)) {
-                        continue;
-                    }
-
-                    numRemoteOnly += 1;
-                    _files.Add(new FileMeta {
-                        FullName = file.FullName,
-                        Modified = file.Modified,
-                        Hash = file.Hash,
-                        Length = file.Length,
-                        Availability = FileAvailability.RemoteOnly,
-                        RemoteFile = file
-                    });
-                }
-
-                Log.Information($"Found {numRemoteOnly} remote-only files");
-
-                SortFiles();
+                
                 ComputeStats();
             });
         }
@@ -112,20 +80,7 @@ namespace DeepArchiver {
 
             await Task.Run(() => {
                 Log.Information($"Add source: {path}");
-                var files = ScanFiles(path);
-                AddLocalFiles(files, true);
-                SortFiles();
-            });
-        }
-
-        public async Task Quit() {
-            await _remote.DisposeAsync();
-            _remote = null;
-        }
-
-        public async Task SaveDatabase() {
-            await Task.Run(() => {
-                _db.Save();
+                AddLocalFiles(ScanFiles(path));
             });
         }
 
@@ -135,47 +90,36 @@ namespace DeepArchiver {
             SaveMeta();
         }
 
-        private void SortFiles() {
-            _files.Sort((a, b) => Tklc.IO.IOHelpers.FileNameNaturalCompare(a.FullName, b.FullName));
+        private void AddRemoteFile(RemoteFileInfo file) {
+            RemoteFiles.Add(file);
+            if (!_remoteFilesMap.TryGetValue(file.FullName, out var list)) {
+                list = new List<RemoteFileInfo>();
+                _remoteFilesMap[file.FullName] = list;
+            }
+
+            list.Add(file);
         }
 
-        private void AddLocalFiles(List<FileMeta> files, bool incremental) {
-            var allRemoteFiles = _remote.Files.OrderByDescending(f => f.Modified).ToList();
-            var remoteFilesMap = new Dictionary<string, RemoteFile>();
-            allRemoteFiles.ForEach(f => {
-                if (!remoteFilesMap.ContainsKey(f.FullName)) {
-                    remoteFilesMap.Add(f.FullName, f);
-                }
-            });
-
+        private void AddLocalFiles(List<LocalFileInfo> files) {
             foreach (var file in files) {
-                // in incremental mode, check if file is already RemoteOnly
-                if (incremental) {
-                    if (_filesMap.TryGetValue(file.FullName, out var existing)) {
-                        existing.Availability = FileSameQuick(remoteFilesMap[file.FullName], file);
-                        continue;
-                    }
-                }
+                LocalFiles.Add(file);
 
-                _filesMap.Add(file.FullName, file);
-                _files.Add(file);
-
-                if (!remoteFilesMap.TryGetValue(file.FullName, out var remoteFile)) {
-                    file.Availability = FileAvailability.LocalOnly;
+                if (!_remoteFilesMap.TryGetValue(file.FullName, out var list)) {
                     continue;
                 }
 
-                file.Availability = FileSameQuick(remoteFile, file);
-                file.RemoteFile = remoteFile;
+                var remoteFile = list.FirstOrDefault(f => f.Length == file.Length && f.Modified == file.Modified);
+                if (remoteFile != null) {
+                    remoteFile.LocalFile = file;
+                    file.RemoteFile = remoteFile;
+                }
             }
-        }
 
-        private static FileAvailability FileSameQuick(RemoteFile remoteFile, FileMeta file) {
-            return remoteFile.Length == file.Length && remoteFile.Modified == file.Modified ? FileAvailability.Synced : FileAvailability.Modified;
+            LocalFiles.Sort((a, b) => Tklc.IO.IOHelpers.FileNameNaturalCompare(a.FullName, b.FullName));
         }
-
-        private static List<FileMeta> ScanFiles(string root) {
-            var list = new List<FileMeta>();
+        
+        private static List<LocalFileInfo> ScanFiles(string root) {
+            var list = new List<LocalFileInfo>();
             var stack = new Stack<string>();
 
             stack.Push(root);
@@ -186,7 +130,7 @@ namespace DeepArchiver {
                 }
 
                 foreach (var file in dir.GetFiles()) {
-                    list.Add(new FileMeta {
+                    list.Add(new LocalFileInfo {
                         FullName = file.FullName,
                         Length = file.Length,
                         Modified = file.LastWriteTimeUtc.Ticks,
@@ -197,24 +141,27 @@ namespace DeepArchiver {
             return list;
         }
 
-        public async Task UploadFile(FileMeta file, Action<int> progressCallback) {
-            var remoteFile = await _service.UploadFile(file.FullName, _remote, file.RemoteFile, progressCallback);
-            file.Hash = remoteFile.Hash;
-            file.Length = remoteFile.Length;
-            file.Modified = remoteFile.Modified;
-            file.Availability = FileAvailability.Synced;
+        public async Task UploadFile(LocalFileInfo file, Action<int> progressCallback) {
+            var remoteFile = await _service.UploadFile(file, _db, progressCallback);
+            AddRemoteFile(remoteFile);
             await Task.Run(ComputeStats);
         }
 
         private void ComputeStats() {
-            var stats = new WorkspaceStats {
-                Count = _files.Count
-            };
+            var stats = new WorkspaceStats();
             
-            foreach (var file in _files) {
+            foreach (var file in LocalFiles) {
                 stats.Counts[file.Availability] += 1;
                 stats.Lengths[file.Availability] += file.Length;
-                stats.Length += file.Length;
+            }
+
+            foreach (var file in RemoteFiles) {
+                if (file.Availability == FileAvailability.Synced) {
+                    continue;
+                }
+
+                stats.Counts[file.Availability] += 1;
+                stats.Lengths[file.Availability] += file.Length;
             }
 
             Stats = stats;

@@ -29,10 +29,6 @@
             this.recentToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.workspaceToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.sourcesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.chkSynced = new System.Windows.Forms.CheckBox();
-            this.chkModified = new System.Windows.Forms.CheckBox();
-            this.chkLocalOnly = new System.Windows.Forms.CheckBox();
-            this.chkRemoteOnly = new System.Windows.Forms.CheckBox();
             this.lstFiles = new System.Windows.Forms.ListView();
             this.colHeaderPath = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colHeaderLength = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
@@ -53,6 +49,10 @@
             this.label1 = new System.Windows.Forms.Label();
             this.sizeLimitUpDown = new System.Windows.Forms.NumericUpDown();
             this.filterGroup = new System.Windows.Forms.GroupBox();
+            this.filterBox = new System.Windows.Forms.TextBox();
+            this.radioSynced = new System.Windows.Forms.RadioButton();
+            this.radioRemoteOnly = new System.Windows.Forms.RadioButton();
+            this.radioLocalOnly = new System.Windows.Forms.RadioButton();
             this.statsLbl = new System.Windows.Forms.Label();
             this.menuStrip1.SuspendLayout();
             this.remoteGroup.SuspendLayout();
@@ -110,54 +110,6 @@
             this.sourcesToolStripMenuItem.Size = new System.Drawing.Size(176, 34);
             this.sourcesToolStripMenuItem.Text = "Sources";
             this.sourcesToolStripMenuItem.Click += new System.EventHandler(this.sourcesToolStripMenuItem_Click);
-            // 
-            // chkSynced
-            // 
-            this.chkSynced.AutoSize = true;
-            this.chkSynced.Location = new System.Drawing.Point(19, 25);
-            this.chkSynced.Name = "chkSynced";
-            this.chkSynced.Size = new System.Drawing.Size(88, 24);
-            this.chkSynced.TabIndex = 1;
-            this.chkSynced.Text = "Synced";
-            this.chkSynced.UseVisualStyleBackColor = true;
-            this.chkSynced.CheckedChanged += new System.EventHandler(this.filters_CheckedChanged);
-            // 
-            // chkModified
-            // 
-            this.chkModified.AutoSize = true;
-            this.chkModified.Checked = true;
-            this.chkModified.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkModified.Location = new System.Drawing.Point(113, 25);
-            this.chkModified.Name = "chkModified";
-            this.chkModified.Size = new System.Drawing.Size(95, 24);
-            this.chkModified.TabIndex = 2;
-            this.chkModified.Text = "Modified";
-            this.chkModified.UseVisualStyleBackColor = true;
-            this.chkModified.CheckedChanged += new System.EventHandler(this.filters_CheckedChanged);
-            // 
-            // chkLocalOnly
-            // 
-            this.chkLocalOnly.AutoSize = true;
-            this.chkLocalOnly.Checked = true;
-            this.chkLocalOnly.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkLocalOnly.Location = new System.Drawing.Point(214, 25);
-            this.chkLocalOnly.Name = "chkLocalOnly";
-            this.chkLocalOnly.Size = new System.Drawing.Size(108, 24);
-            this.chkLocalOnly.TabIndex = 3;
-            this.chkLocalOnly.Text = "Local Only";
-            this.chkLocalOnly.UseVisualStyleBackColor = true;
-            this.chkLocalOnly.CheckedChanged += new System.EventHandler(this.filters_CheckedChanged);
-            // 
-            // chkRemoteOnly
-            // 
-            this.chkRemoteOnly.AutoSize = true;
-            this.chkRemoteOnly.Location = new System.Drawing.Point(328, 25);
-            this.chkRemoteOnly.Name = "chkRemoteOnly";
-            this.chkRemoteOnly.Size = new System.Drawing.Size(127, 24);
-            this.chkRemoteOnly.TabIndex = 4;
-            this.chkRemoteOnly.Text = "Remote Only";
-            this.chkRemoteOnly.UseVisualStyleBackColor = true;
-            this.chkRemoteOnly.CheckedChanged += new System.EventHandler(this.filters_CheckedChanged);
             // 
             // lstFiles
             // 
@@ -356,16 +308,58 @@
             // 
             // filterGroup
             // 
-            this.filterGroup.Controls.Add(this.chkSynced);
-            this.filterGroup.Controls.Add(this.chkModified);
-            this.filterGroup.Controls.Add(this.chkLocalOnly);
-            this.filterGroup.Controls.Add(this.chkRemoteOnly);
+            this.filterGroup.Controls.Add(this.filterBox);
+            this.filterGroup.Controls.Add(this.radioSynced);
+            this.filterGroup.Controls.Add(this.radioRemoteOnly);
+            this.filterGroup.Controls.Add(this.radioLocalOnly);
             this.filterGroup.Location = new System.Drawing.Point(12, 36);
             this.filterGroup.Name = "filterGroup";
             this.filterGroup.Size = new System.Drawing.Size(1062, 58);
             this.filterGroup.TabIndex = 12;
             this.filterGroup.TabStop = false;
             this.filterGroup.Text = "Filter";
+            // 
+            // filterBox
+            // 
+            this.filterBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.filterBox.Location = new System.Drawing.Point(357, 23);
+            this.filterBox.Name = "filterBox";
+            this.filterBox.Size = new System.Drawing.Size(699, 26);
+            this.filterBox.TabIndex = 3;
+            this.filterBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.filterBox_KeyDown);
+            // 
+            // radioSynced
+            // 
+            this.radioSynced.AutoSize = true;
+            this.radioSynced.Location = new System.Drawing.Point(264, 25);
+            this.radioSynced.Name = "radioSynced";
+            this.radioSynced.Size = new System.Drawing.Size(87, 24);
+            this.radioSynced.TabIndex = 2;
+            this.radioSynced.Text = "Synced";
+            this.radioSynced.UseVisualStyleBackColor = true;
+            // 
+            // radioRemoteOnly
+            // 
+            this.radioRemoteOnly.AutoSize = true;
+            this.radioRemoteOnly.Location = new System.Drawing.Point(132, 25);
+            this.radioRemoteOnly.Name = "radioRemoteOnly";
+            this.radioRemoteOnly.Size = new System.Drawing.Size(126, 24);
+            this.radioRemoteOnly.TabIndex = 1;
+            this.radioRemoteOnly.Text = "Remote Only";
+            this.radioRemoteOnly.UseVisualStyleBackColor = true;
+            // 
+            // radioLocalOnly
+            // 
+            this.radioLocalOnly.AutoSize = true;
+            this.radioLocalOnly.Checked = true;
+            this.radioLocalOnly.Location = new System.Drawing.Point(19, 25);
+            this.radioLocalOnly.Name = "radioLocalOnly";
+            this.radioLocalOnly.Size = new System.Drawing.Size(107, 24);
+            this.radioLocalOnly.TabIndex = 0;
+            this.radioLocalOnly.TabStop = true;
+            this.radioLocalOnly.Text = "Local Only";
+            this.radioLocalOnly.UseVisualStyleBackColor = true;
             // 
             // statsLbl
             // 
@@ -413,13 +407,9 @@
         private System.Windows.Forms.MenuStrip menuStrip1;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem openWorkspaceToolStripMenuItem;
-        private System.Windows.Forms.CheckBox chkSynced;
-        private System.Windows.Forms.CheckBox chkModified;
         private System.Windows.Forms.ToolStripMenuItem recentToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem workspaceToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem sourcesToolStripMenuItem;
-        private System.Windows.Forms.CheckBox chkLocalOnly;
-        private System.Windows.Forms.CheckBox chkRemoteOnly;
         private System.Windows.Forms.ListView lstFiles;
         private System.Windows.Forms.ColumnHeader colHeaderPath;
         private System.Windows.Forms.ColumnHeader colHeaderLength;
@@ -441,6 +431,10 @@
         private System.Windows.Forms.GroupBox filterGroup;
         private System.Windows.Forms.Label statsLbl;
         private System.Windows.Forms.CheckBox showRemoteChk;
+        private System.Windows.Forms.RadioButton radioSynced;
+        private System.Windows.Forms.RadioButton radioRemoteOnly;
+        private System.Windows.Forms.RadioButton radioLocalOnly;
+        private System.Windows.Forms.TextBox filterBox;
     }
 }
 

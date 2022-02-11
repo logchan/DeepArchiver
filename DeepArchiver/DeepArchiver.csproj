@@ -182,10 +182,8 @@
     <Compile Include="Data\DbRemoteFile.cs" />
     <Compile Include="Data\DeepArchiverData.cs" />
     <Compile Include="Data\JsonDb.cs" />
-    <Compile Include="Data\RemoteFile.cs" />
-    <Compile Include="Data\RemoteDb.cs" />
     <Compile Include="FileAvailability.cs" />
-    <Compile Include="FileMeta.cs" />
+    <Compile Include="LocalFileInfo.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -194,6 +192,7 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RemoteFileInfo.cs" />
     <Compile Include="Remote\AwsRemote.cs" />
     <Compile Include="Remote\ConfigParser.cs" />
     <Compile Include="Remote\LocalFileRemote.cs" />

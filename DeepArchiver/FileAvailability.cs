@@ -3,6 +3,5 @@
         LocalOnly,
         RemoteOnly,
         Synced,
-        Modified
     }
 }
