@@ -41,7 +41,14 @@ namespace DeepArchiver.Remote {
             };
         }
 
+        public async Task DeleteFile(RemoteFileInfo remoteFile, JsonDb<DeepArchiverData> db) {
+            await Delete(remoteFile.Hash);
+            db.Data.RemoteFiles.RemoveAll(f => f.Hash == remoteFile.Hash);
+            db.Save();
+        }
+
         protected abstract Task Upload(string path, string hash, Action<int> progressCallback);
+        protected abstract Task Delete(string hash);
 
         private static async Task<string> FileHash(string path) {
             return await Task.Run(() => {

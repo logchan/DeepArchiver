@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DeepArchiver.Remote {
@@ -33,6 +30,16 @@ namespace DeepArchiver.Remote {
                             progressCallback(progress);
                         }
                     } while (read != 0);
+                }
+            });
+        }
+
+        protected override async Task Delete(string hash) {
+            await Task.Run(() => {
+                var dir = Path.Combine(Root, hash.Substring(0, 2));
+                var file = Path.Combine(dir, hash);
+                if (File.Exists(file)) {
+                    File.Delete(file);
                 }
             });
         }

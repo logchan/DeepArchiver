@@ -24,6 +24,7 @@ namespace DeepArchiver {
         private string MetaFile => Path.Combine(Root, "meta.json");
 
         private WorkspaceMeta _meta = new WorkspaceMeta();
+        private readonly Dictionary<string, LocalFileInfo> _localFilesMap = new Dictionary<string, LocalFileInfo>();
         private readonly Dictionary<string, List<RemoteFileInfo>> _remoteFilesMap = new Dictionary<string, List<RemoteFileInfo>>();
 
         private RemoteService _service;
@@ -103,6 +104,7 @@ namespace DeepArchiver {
         private void AddLocalFiles(List<LocalFileInfo> files) {
             foreach (var file in files) {
                 LocalFiles.Add(file);
+                _localFilesMap[file.FullName] = file;
 
                 if (!_remoteFilesMap.TryGetValue(file.FullName, out var list)) {
                     continue;
@@ -144,6 +146,19 @@ namespace DeepArchiver {
         public async Task UploadFile(LocalFileInfo file, Action<int> progressCallback) {
             var remoteFile = await _service.UploadFile(file, _db, progressCallback);
             AddRemoteFile(remoteFile);
+            await Task.Run(ComputeStats);
+        }
+
+        public async Task DeleteFile(RemoteFileInfo file) {
+            await _service.DeleteFile(file, _db);
+            RemoteFiles.Remove(file);
+            _remoteFilesMap[file.FullName].Remove(file);
+
+            if (_localFilesMap.TryGetValue(file.FullName, out var localFile)) {
+                if (ReferenceEquals(localFile.RemoteFile, file)) {
+                    localFile.RemoteFile = null;
+                }
+            }
             await Task.Run(ComputeStats);
         }
 

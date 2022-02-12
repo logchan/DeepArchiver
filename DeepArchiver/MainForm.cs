@@ -310,12 +310,16 @@ namespace DeepArchiver {
             connStrBox.PasswordChar = showRemoteChk.Checked ? '\0' : '*';
         }
 
-        private void lstFiles_KeyDown(object sender, KeyEventArgs e) {
+        private async void lstFiles_KeyDown(object sender, KeyEventArgs e) {
             if (lstFiles.SelectedItems.Count == 0) {
                 return;
             }
-            
 
+            if (_shownAvailability == FileAvailability.RemoteOnly && e.Shift && e.KeyCode == Keys.Delete) {
+                await _workspace.DeleteFile((RemoteFileInfo) lstFiles.SelectedItems[0].Tag);
+                RefreshList();
+                SetStatsString();
+            }
         }
 
         private void filterBox_KeyDown(object sender, KeyEventArgs e) {

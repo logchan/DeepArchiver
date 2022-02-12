@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 
 namespace DeepArchiver.Remote {
@@ -37,6 +38,13 @@ namespace DeepArchiver.Remote {
             };
 
             await transfer.UploadAsync(request);
+        }
+
+        protected override async Task Delete(string hash) {
+            await _client.DeleteObjectAsync(new DeleteObjectRequest {
+                BucketName = _bucket,
+                Key = hash,
+            });
         }
     }
 }
