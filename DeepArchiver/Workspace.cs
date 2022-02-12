@@ -58,7 +58,7 @@ namespace DeepArchiver {
                 }
 
                 foreach (var list in _remoteFilesMap.Values) {
-                    list.Sort((a, b) => b.Modified.CompareTo(a));
+                    list.Sort((a, b) => b.Modified.CompareTo(a.Modified));
                 }
 
                 RemoteFiles.Sort((a, b) => Tklc.IO.IOHelpers.FileNameNaturalCompare(a.FullName, b.FullName));
